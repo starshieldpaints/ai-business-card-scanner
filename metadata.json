@@ -1,0 +1,8 @@
+{
+  "name": "AI Business Card Scanner",
+  "description": "Scan business cards using your camera or an image file and automatically extract contact information.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "prompt": ""
+}
