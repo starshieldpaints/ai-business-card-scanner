@@ -1,0 +1,151 @@
+// {
+//   "firestore": {
+//     "database": "(default)",
+//     "location": "nam5",
+//     "rules": "firestore.rules",
+//     "indexes": "firestore.indexes.json"
+//   },
+//   "functions": [
+//     {
+//       "source": "functions",
+//       "codebase": "default",
+//       "predeploy": [],
+//       "ignore": [
+//         "node_modules",
+//         ".git",
+//         "firebase-debug.log",
+//         "firebase-debug.*.log",
+//         "*.local"
+//       ]
+//     }
+//   ],
+//   "apphosting": {
+//     "backendId": "my-web-app",
+//     "rootDir": "/",
+//     "ignore": [
+//       "node_modules",
+//       ".git",
+//       "firebase-debug.log",
+//       "firebase-debug.*.log",
+//       "functions"
+//     ]
+//   },
+//   "hosting": {
+//     "public": "public",
+//     "ignore": [
+//       "firebase.json",
+//       "**/.*",
+//       "**/node_modules/**"
+//     ]
+//   }
+// }
+
+
+// {
+//   "hosting": {
+//     "source": ".",
+//     "ignore": [
+//       "firebase.json",
+//       "**/.*",
+//       "**/node_modules/**"
+//     ],
+//     // "rewrites": [
+//     //   {
+//     //     "source": "**",
+//     //     "run": {
+//     //       "serviceId": "my-web-app",
+//     //       "region": "us-central1"
+//     //       } ,
+//     //     "destination": "/index.html"
+//     //   }
+//     // ],
+//     "frameworksBackend": {
+//       "id": "my-web-app",
+//       "region": "us-central1",
+//       "secretEnvironmentVariables": [
+//         {
+//           "key": "VITE_FIREBASE_API_KEY",
+//           "secret": "AIzaSyApQl0pE8DBMRFIr6G2Bv89Nu6uk0W5dzE"
+//         },
+//         {
+//           "key": "VITE_FIREBASE_AUTH_DOMAIN",
+//           "secret": "visiting-card-d4126.firebaseapp.com"
+//         },
+//         {
+//           "key": "VITE_FIREBASE_PROJECT_ID",
+//           "secret": "visiting-card-d4126"
+//         },
+//         {
+//           "key": "VITE_FIREBASE_STORAGE_BUCKET",
+//           "secret": "visiting-card-d4126.firebasestorage.app"
+//         },
+//         {
+//           "key": "VITE_FIREBASE_MESSAGING_SENDER_ID",
+//           "secret": "1094782640799"
+//         },
+//         {
+//           "key": "VITE_FIREBASE_APP_ID",
+//           "secret": "1:1094782640799:web:e5866fd7925e3014a278aa"
+//         },
+//         {
+//           "key": "VITE_GOOGLE_API_KEY",
+//           "secret": "AIzaSyAlmGHbDwLggS9ob3Qe2ALiYNoV7cU4k5k"
+//         }
+//       ]
+//     }
+//   },
+//   "firestore": {
+//     "rules": "firestore.rules",
+//     "indexes": "firestore.indexes.json"
+//   }
+// }
+
+
+{
+  "hosting": {
+    "source": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "frameworksBackend": {
+      "id": "my-web-app",
+      "region": "us-central1",
+      "secretEnvironmentVariables": [
+        {
+          "key": "VITE_FIREBASE_API_KEY",
+          "secret": "VITE_FIREBASE_API_KEY"
+        },
+        {
+          "key": "VITE_FIREBASE_AUTH_DOMAIN",
+          "secret": "VITE_FIREBASE_AUTH_DOMAIN"
+        },
+        {
+          "key": "VITE_FIREBASE_PROJECT_ID",
+          "secret": "VITE_FIREBASE_PROJECT_ID"
+        },
+        {
+          "key": "VITE_FIREBASE_STORAGE_BUCKET",
+          "secret": "VITE_FIREBASE_STORAGE_BUCKET"
+        },
+        {
+          "key": "VITE_FIREBASE_MESSAGING_SENDER_ID",
+          "secret": "VITE_FIREBASE_MESSAGING_SENDER_ID"
+        },
+        {
+          "key": "VITE_FIREBASE_APP_ID",
+          "secret": "VITE_FIREBASE_APP_ID"
+        },
+        {
+          "key": "VITE_GOOGLE_API_KEY",
+          "secret": "VITE_GOOGLE_API_KEY"
+        }
+      ]
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
