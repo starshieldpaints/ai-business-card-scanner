@@ -1,7 +1,0 @@
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /visiting_cards/{docId} {
-      allow read, write: if true; // or add auth
-    }
-  }
-}

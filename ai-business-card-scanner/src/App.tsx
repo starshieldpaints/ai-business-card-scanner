@@ -858,6 +858,7 @@
 
 // export default App;
 
+
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { FirebaseApp } from "firebase/app";
@@ -874,11 +875,17 @@ import {
   addDoc,
   deleteDoc,
   doc,
+  updateDoc, // Import updateDoc
   serverTimestamp,
   query,
   orderBy
 } from "firebase/firestore";
-import logo from './assets/logo.jpg';
+
+// --- Asset Placeholder ---
+// In a real project, you would import this from your assets folder
+// import logo from './assets/logo.jpg';
+const logo = 'https://placehold.co/100x100/ef4444/ffffff?text=CS';
+
 
 // --- Global Error Handler ---
 window.addEventListener('unhandledrejection', function(event) {
@@ -891,6 +898,7 @@ window.addEventListener('unhandledrejection', function(event) {
 });
 
 // --- Firebase Configuration ---
+// IMPORTANT: Replace with your actual Firebase config
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -900,6 +908,7 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+// IMPORTANT: Replace with your actual Google AI API Key
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
 // --- Configuration Checks ---
@@ -980,7 +989,7 @@ const App = () => {
 
   // Bulk Upload State
   const [bulkItems, setBulkItems] = useState<BulkFileItem[]>([]);
-  
+
   // AI Command Center State
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -1008,7 +1017,7 @@ const App = () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     };
   }, []);
-  
+
   useEffect(() => {
     if (chatDisplayRef.current) {
         chatDisplayRef.current.scrollTop = chatDisplayRef.current.scrollHeight;
@@ -1022,7 +1031,7 @@ const App = () => {
       const q = query(contactsCollectionRef, orderBy("createdAt", "desc"));
       const data = await getDocs(q);
       const contacts = data.docs.map(doc => {
-        const docData = doc.data() as DocumentData; 
+        const docData = doc.data() as DocumentData;
         return {
           id: doc.id,
           name: docData.name || "",
@@ -1079,7 +1088,7 @@ const App = () => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
-    
+
     if (mode === 'bulk') {
         const newBulkItems: BulkFileItem[] = Array.from(files).map((file: File) => ({
             id: `${file.name}-${Date.now()}`,
@@ -1104,7 +1113,7 @@ const App = () => {
     }
     if(fileInputRef.current) fileInputRef.current.value = '';
   };
-  
+
   const openCamera = async (forSide: 'front' | 'back') => {
     setCameraFor(forSide);
     try {
@@ -1132,7 +1141,7 @@ const App = () => {
     setIsCameraOpen(false);
     streamRef.current = null;
   };
-  
+
   const takeSnapshot = () => {
     if (videoRef.current) {
       const canvas = document.createElement("canvas");
@@ -1156,7 +1165,7 @@ const App = () => {
     const parts: Part[] = [
       { inlineData: { mimeType: 'image/jpeg', data: frontB64 } },
     ];
-    let promptText = `Analyze the business card image(s) and extract the contact details. Return a single JSON object with the following keys: "name", "designation", "company", "phoneNumbers", "emails", "websites", "address", "whatsapp", "group", "notes". For "whatsapp", find a WhatsApp number if explicitly mentioned. For "group" or "notes", extract any relevant info or leave blank. If any information is not found, return an empty string for string fields or an empty array for array fields.`;
+    let promptText = `Analyze the business card image(s) and extract the contact details. Return a single JSON object with the following keys: "name", "designation", "company", "phoneNumbers", "emails", "websites", "address", "whatsapp", "group", "notes". For "whatsapp", find a WhatsApp number if explicitly mentioned. For "group", categorize the contact (e.g., 'Client', 'Lead', 'Personal') or leave blank. For "notes", extract any additional relevant info. If any information is not found, return an empty string for string fields or an empty array for array fields.`;
     if (backB64) {
       parts.push({ inlineData: { mimeType: 'image/jpeg', data: backB64 } });
     }
@@ -1230,7 +1239,7 @@ const App = () => {
           handleDataChange(field, newArray);
       }
   };
-  
+
   const saveContact = async () => {
     if (!db || !contactsCollectionRef) {
         setError("Firebase not configured. Cannot save contact.");
@@ -1238,7 +1247,7 @@ const App = () => {
     }
     if (extractedData && frontImageBase64) {
       setIsLoading(true);
-      const newContactPayload = {
+      const contactPayload = {
         name: extractedData.name || "",
         designation: extractedData.designation || "",
         company: extractedData.company || "",
@@ -1252,8 +1261,15 @@ const App = () => {
         whatsapp: extractedData.whatsapp || "",
         createdAt: serverTimestamp(),
       };
+
       try {
-        await addDoc(contactsCollectionRef, newContactPayload);
+        // If it has an ID, it's an existing contact being updated
+        if ('id' in extractedData && extractedData.id) {
+            const contactDocRef = doc(db, "visiting_cards", extractedData.id);
+            await updateDoc(contactDocRef, contactPayload);
+        } else { // Otherwise, it's a new contact
+            await addDoc(contactsCollectionRef, contactPayload);
+        }
         resetState();
         fetchContacts();
       } catch (e) {
@@ -1300,6 +1316,7 @@ const App = () => {
            }
         }
     }
+    // A non-blocking notification would be better in a real app
     alert(`${successCount} of ${successfulItems.length} contacts saved successfully.`);
     resetState();
     fetchContacts();
@@ -1307,6 +1324,7 @@ const App = () => {
 
   const deleteContact = async (id: string) => {
     if (!db || !contactsCollectionRef) return;
+    // Non-blocking confirm is better
     const isConfirmed = window.confirm("Are you sure you want to delete this contact?");
     if (isConfirmed) {
         try {
@@ -1322,7 +1340,7 @@ const App = () => {
         }
     }
   };
-  
+
   const editContact = (contact: ContactData) => {
     setExtractedData(contact);
     setFrontImageBase64(contact.imageBase64);
@@ -1354,13 +1372,13 @@ const App = () => {
     a.href = url;
     a.download = (name?.replace(/\s/g, '_') || 'contact') + '.vcf';
     document.body.appendChild(a);
-    a.click();
+a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-  
+
   const downloadCsv = (data: Partial<ContactData>[]) => {
-      const headers = "Name,Designation,Company,Phone Numbers,Emails,Websites,Address\n";
+      const headers = "Name,Designation,Company,Phone Numbers,Emails,Websites,Address,Group,WhatsApp,Notes\n";
       const escapeCsvField = (field: string | null | undefined): string => {
         if (field === null || field === undefined) return '""';
         const str = String(field).replace(/"/g, '""').replace(/\n/g, ' ');
@@ -1374,6 +1392,9 @@ const App = () => {
           escapeCsvField((d.emails || []).join(', ')),
           escapeCsvField((d.websites || []).join(', ')),
           escapeCsvField(d.address),
+          escapeCsvField(d.group),
+          escapeCsvField(d.whatsapp),
+          escapeCsvField(d.notes),
       ].join(','));
       const csv = headers + rows.join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1386,7 +1407,7 @@ const App = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
   };
-  
+
   const handleCommandSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || isChatLoading || !isAiConfigured || !API_KEY) return;
@@ -1405,8 +1426,6 @@ const App = () => {
                 company: c.company,
                 phoneNumbers: c.phoneNumbers,
                 emails: c.emails,
-                websites: c.websites,
-                address: c.address,
                 group: c.group,
                 whatsapp: c.whatsapp,
             }))
@@ -1440,20 +1459,21 @@ const App = () => {
         <div className="min-h-screen bg-slate-900 font-sans flex items-center justify-center p-4">
             <div className="bg-red-700 text-white p-8 rounded-2xl shadow-2xl text-center max-w-md w-full">
               <h2 className="text-3xl font-bold mb-4">Configuration Error</h2>
-              {!isFirebaseConfigured && <p className="mb-2">Your Firebase configuration is incomplete. Please check your <code>.env</code> file.</p>}
-              {!isAiConfigured && <p>Your Google AI API Key is missing. Please check your <code>.env</code> file.</p>}
+              <p className="mb-4">Please make sure your Firebase and Google AI API keys are correctly set up in the source code.</p>
+              {!isFirebaseConfigured && <p className="mb-2 font-semibold">Firebase configuration is INCOMPLETE.</p>}
+              {!isAiConfigured && <p className="font-semibold">Google AI API Key is MISSING.</p>}
               <p className="mt-6 text-red-200">The application cannot start without valid configurations.</p>
             </div>
         </div>
       )
   }
-  
+
   const renderField = (label: string, field: keyof Omit<ContactData, 'id' | 'imageBase64'>, isTextArea = false) => {
      const commonProps = {
         id: field,
         value: ((extractedData?.[field] as string) || ''),
         onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => handleDataChange(field, e.target.value),
-        className: "w-full p-2.5 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 transition"
+        className: "w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 transition"
      };
      return (
      <div className={`form-group ${isTextArea ? 'md:col-span-2' : ''}`}>
@@ -1461,7 +1481,7 @@ const App = () => {
       {isTextArea ? <textarea {...commonProps} rows={3} /> : <input type="text" {...commonProps} />}
     </div>
   )};
-  
+
   const renderArrayField = (label: string, field: keyof Omit<ContactData, 'id' | 'imageBase64'>) => (
     <div className="form-group md:col-span-2">
       <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
@@ -1471,9 +1491,10 @@ const App = () => {
             type="text"
             value={item}
             onChange={(e) => handleArrayDataChange(field, index, e.target.value)}
-            className="w-full p-2.5 border border-slate-300 rounded-lg shadow-sm mb-2 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition"
+            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg shadow-sm mb-2 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition"
           />
       ))}
+       <button onClick={() => handleDataChange(field, [...(extractedData?.[field] as string[] || []), ''])} className="text-sm text-red-600 hover:text-red-800 font-semibold mt-1">+ Add {label.slice(0,-1)}</button>
     </div>
   );
 
@@ -1501,8 +1522,8 @@ const App = () => {
     // If we are verifying/editing a card, show that form.
     if(extractedData) {
       return (
-        <div className="card results-section bg-white p-6 rounded-2xl shadow-md border border-slate-200">
-          <h2 className="text-2xl font-bold mb-6 text-slate-900">Verify & Save Contact</h2>
+        <div className="card results-section bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+          <h2 className="text-2xl font-bold mb-6 text-slate-900">{'id' in extractedData ? 'Edit Contact' : 'Verify & Save Contact'}</h2>
            <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             {renderField("Name", "name")}
             {renderField("Designation", "designation")}
@@ -1518,32 +1539,32 @@ const App = () => {
           <div className="result-actions flex flex-wrap gap-4 mt-8">
             <PrimaryButton onClick={saveContact} disabled={isLoading}>Save Contact</PrimaryButton>
             <SecondaryButton onClick={() => downloadVcf(extractedData)}>Download .vcf</SecondaryButton>
-            <button onClick={resetState} className="font-semibold text-red-600 hover:text-red-800 transition-all py-2.5 px-5">Cancel</button>
+            <button onClick={resetState} className="font-semibold text-slate-600 hover:text-slate-800 transition-all py-2.5 px-5">Cancel</button>
           </div>
         </div>
       );
     }
-    
+
     // Default view with tabs
     return (
-       <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-md border border-slate-200">
+       <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-slate-200">
           <div className="border-b border-slate-200 mb-6">
-              <nav className="-mb-px flex space-x-6">
-                <button className={`py-3 px-1 border-b-2 font-semibold text-base sm:text-lg ${mode === 'single' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`} onClick={() => setMode('single')}>Single Card</button>
-                <button className={`py-3 px-1 border-b-2 font-semibold text-base sm:text-lg ${mode === 'bulk' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`} onClick={() => setMode('bulk')}>Bulk Upload</button>
-                <button className={`py-3 px-1 border-b-2 font-semibold text-base sm:text-lg ${mode === 'chat' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`} onClick={() => setMode('chat')}>AI Assistant</button>
+              <nav className="-mb-px flex space-x-2 sm:space-x-6">
+                <button className={`py-3 px-1 border-b-2 font-semibold text-sm sm:text-lg ${mode === 'single' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`} onClick={() => setMode('single')}>Single Card</button>
+                <button className={`py-3 px-1 border-b-2 font-semibold text-sm sm:text-lg ${mode === 'bulk' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`} onClick={() => setMode('bulk')}>Bulk Upload</button>
+                <button className={`py-3 px-1 border-b-2 font-semibold text-sm sm:text-lg ${mode === 'chat' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`} onClick={() => setMode('chat')}>AI Assistant</button>
               </nav>
           </div>
-        
+
           <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" multiple={mode === 'bulk'} className="hidden"/>
 
           {mode === 'single' && (
             <>
               {!frontImageBase64 ? (
-                <div onClick={() => fileInputRef.current?.click()} className="mt-2 flex justify-center rounded-lg border-2 border-dashed border-slate-300 px-6 py-10 hover:border-red-500 transition-all cursor-pointer">
+                <div onClick={() => fileInputRef.current?.click()} className="mt-2 flex justify-center rounded-lg border-2 border-dashed border-slate-300 px-6 py-10 hover:border-red-500 transition-all cursor-pointer bg-slate-50/50">
                   <div className="text-center">
                     <svg className="mx-auto h-12 w-12 text-slate-400" stroke="currentColor" fill="none" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                    <p className="mt-2 text-sm text-slate-600"><span className="font-semibold text-red-600">Upload Card Image</span> or drag and drop</p>
+                    <p className="mt-2 text-sm text-slate-600"><span className="font-semibold text-red-600">Upload Card Image</span> or use camera</p>
                     <p className="text-xs text-slate-500">PNG, JPG, GIF up to 10MB</p>
                   </div>
                 </div>
@@ -1554,8 +1575,8 @@ const App = () => {
                     <p className="text-center mt-2 font-semibold text-slate-700">Profile Picture / Front</p>
                   </div>
                   <div className="preview-container flex flex-col items-center justify-center">
-                    {backImageBase64 ? ( <> <img src={`data:image/jpeg;base64,${backImageBase64}`} alt="Back Preview" className="w-full rounded-lg shadow-xl"/><p className="text-center mt-2 font-semibold text-slate-700">Back</p> </> ) : 
-                    ( <div onClick={() => fileInputRef.current?.click()} className="w-full h-full flex justify-center items-center rounded-lg border-2 border-dashed border-slate-300 px-6 py-10 hover:border-red-500 transition-all cursor-pointer">
+                    {backImageBase64 ? ( <> <img src={`data:image/jpeg;base64,${backImageBase64}`} alt="Back Preview" className="w-full rounded-lg shadow-xl"/><p className="text-center mt-2 font-semibold text-slate-700">Back</p> </> ) :
+                    ( <div onClick={() => fileInputRef.current?.click()} className="w-full h-full flex justify-center items-center rounded-lg border-2 border-dashed border-slate-300 px-6 py-10 hover:border-red-500 transition-all cursor-pointer bg-slate-50/50">
                         <div className="text-center"> <svg className="mx-auto h-10 w-10 text-slate-400" stroke="currentColor" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg> <p className="mt-2 text-sm text-slate-600 font-semibold text-red-600">Add back side</p> </div>
                       </div>
                     )}
@@ -1646,7 +1667,7 @@ const App = () => {
           </h1>
         </div>
       </header>
-      
+
       {showInstallBanner && (
         <div className="bg-gradient-to-r from-red-600 to-red-700 text-white px-4 py-3 flex flex-col sm:flex-row justify-between items-center shadow-lg text-center sm:text-left">
           <p className="font-semibold mb-2 sm:mb-0">📲 Install this app for a native experience!</p>
@@ -1656,7 +1677,7 @@ const App = () => {
 
       {/* Main Dashboard Layout */}
       <main className="p-4 md:p-8 grid grid-cols-1 lg:grid-cols-5 gap-8 max-w-7xl mx-auto">
-        
+
         {/* Left Column: Action Panel */}
         <div className="lg:col-span-3">
           <ActionPanel />
@@ -1664,30 +1685,30 @@ const App = () => {
 
         {/* Right Column: Contact List */}
         <div className="lg:col-span-2">
-           <div className="card contact-list bg-white p-6 rounded-2xl shadow-md border border-slate-200">
+           <div className="card contact-list bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
                 <h2 className="text-2xl font-bold mb-4 text-slate-900">Saved Contacts</h2>
                 <ul className="space-y-3 h-[75vh] overflow-y-auto pr-2">
                 {savedContacts.map(contact => (
-                    <li 
-                      key={contact.id} 
+                    <li
+                      key={contact.id}
                       onClick={() => editContact(contact)}
                       className="contact-item flex justify-between items-center p-3 bg-slate-50 rounded-xl hover:bg-red-50/50 border border-slate-200 hover:border-red-200 transition-all group cursor-pointer"
                     >
                       <div className="flex items-center gap-4 overflow-hidden">
-                          <img src={`data:image/jpeg;base64,${contact.imageBase64 || logo}`} alt={contact.name} className="h-12 w-12 rounded-full object-cover shrink-0 border-2 border-white shadow" />
+                          <img src={contact.imageBase64 ? `data:image/jpeg;base64,${contact.imageBase64}` : `https://placehold.co/100x100/e2e8f0/64748b?text=${contact.name.charAt(0)}`} alt={contact.name} className="h-12 w-12 rounded-full object-cover shrink-0 border-2 border-white shadow" />
                           <div className="info overflow-hidden">
                               <h3 className="font-semibold text-lg text-slate-800 truncate">{contact.name || 'No Name'}</h3>
                               <p className="text-sm text-slate-500 truncate">{contact.company || 'No Company'}</p>
                               {contact.group && <span className="text-xs bg-blue-100 text-blue-600 font-semibold px-2 py-0.5 rounded-full mt-1 inline-block">{contact.group}</span>}
                           </div>
                       </div>
-                      <div className="actions flex gap-3 shrink-0">
+                      <div className="actions flex gap-1 sm:gap-3 shrink-0">
                           {contact.whatsapp && (
-                              <a 
-                                href={`https://wa.me/${contact.whatsapp.replace(/[^0-9]/g, '')}`} 
-                                target="_blank" 
+                              <a
+                                href={`https://wa.me/${contact.whatsapp.replace(/[^0-9]/g, '')}`}
+                                target="_blank"
                                 rel="noopener noreferrer"
-                                title="Send WhatsApp" 
+                                title="Send WhatsApp"
                                 onClick={(e) => e.stopPropagation()} // Prevent card click when clicking WhatsApp
                                 className="text-green-500 hover:text-green-700 transition-colors p-1 rounded-full hover:bg-green-100"
                               >
@@ -1704,7 +1725,7 @@ const App = () => {
             </div>
         </div>
 
-        {/* Global Modals */}
+        {/* Global Modals & Loaders */}
         {isCameraOpen && (
             <div className="video-container fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-50 p-4">
                 <video ref={videoRef} autoPlay playsInline className="w-full max-w-2xl rounded-lg shadow-2xl"></video>
@@ -1714,8 +1735,8 @@ const App = () => {
                 </div>
             </div>
         )}
-        {error && <div className="error-message bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mt-6" role="alert">{error}</div>}
-        {isLoading && mode !== 'bulk' && !extractedData && (
+        {error && <div className="fixed bottom-5 right-5 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50" role="alert">{error} <button onClick={() => setError(null)} className="font-bold ml-4">X</button></div>}
+        {isLoading && !extractedData && (
             <div className="loading-overlay fixed inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
                 <div className="spinner border-4 border-t-4 border-t-red-600 border-slate-200 rounded-full w-16 h-16 animate-spin"></div>
                 <p className="text-slate-700 text-lg font-semibold mt-4">Scanning your card...</p>
@@ -1724,7 +1745,7 @@ const App = () => {
 
       </main>
       <footer className="bg-slate-800 text-slate-400 text-center py-5 mt-12 text-sm">
-        <p>© {new Date().getFullYear()} StarShield Technologies Pvt Ltd. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} AI Card Scanner. All rights reserved.</p>
       </footer>
     </div>
   );
