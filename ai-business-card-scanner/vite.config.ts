@@ -13,15 +13,15 @@ export default defineConfig({
         start_url: '/',
         display: 'standalone',
         background_color: '#ffffff',
-        theme_color: '#6200ee',
+        theme_color: '#ee0020ff',
         icons: [
           {
-            src: 'icon-192.png',
+            src: 'favicon.ico',
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: 'icon-512.png',
+            src: 'favicon.ico',
             sizes: '512x512',
             type: 'image/png',
           },
