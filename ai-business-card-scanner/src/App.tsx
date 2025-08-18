@@ -2053,6 +2053,7 @@ const App = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [focusBox, setFocusBox] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
 
+
   // --- Refs ---
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -2640,6 +2641,7 @@ const App = () => {
       .video-container video { width: 100%; height: 100%; object-fit: contain; border-radius: var(--radius); display: block; }
       .focus-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 2px solid #ffffff; border-radius: var(--radius); pointer-events: none; }
       @media (max-width: 640px) { .actions-row { flex-direction: column; } }
+
       .video-controls { display: flex; gap: 1.5rem; margin-top: 1.5rem; }
       .video-controls button { padding: 1rem 2rem; font-size: 1.125rem; border-radius: 9999px; }
       .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); backdrop-filter: blur(4px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; }
@@ -2698,6 +2700,7 @@ const App = () => {
               <div className="video-wrapper">
                 <video ref={videoRef} autoPlay playsInline muted className="camera-view" onCanPlay={handleCanPlay} onClick={() => isCameraReady && takeSnapshot()}></video>
                 <div className="focus-box" style={{ width: `${focusBox.width}px`, height: `${focusBox.height}px` }}></div>
+
                 {!isCameraReady && <div className="camera-loading-spinner"><div className="spinner"></div></div>}
               </div>
               <div className="video-controls">
