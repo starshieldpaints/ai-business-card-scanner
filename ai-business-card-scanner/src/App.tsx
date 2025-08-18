@@ -2051,6 +2051,8 @@ const App = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [focusBox, setFocusBox] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
 
   // --- Refs ---
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2135,11 +2137,34 @@ const App = () => {
         }
     };
   }, [isCameraOpen]);
-  
+
+  const updateFocusBox = () => {
+    if (!videoRef.current) return;
+    const CARD_RATIO = 1.586; // standard business card aspect ratio
+    const vw = videoRef.current.videoWidth;
+    const vh = videoRef.current.videoHeight;
+    let width = vw * 0.8;
+    let height = width / CARD_RATIO;
+    if (height > vh * 0.8) {
+      height = vh * 0.8;
+      width = height * CARD_RATIO;
+    }
+    setFocusBox({ width, height });
+  };
+
+  useEffect(() => {
+    if (!isCameraOpen) return;
+    const handleResize = () => updateFocusBox();
+    window.addEventListener('resize', handleResize);
+    updateFocusBox();
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isCameraOpen]);
+
   const handleCanPlay = () => {
     if(videoRef.current) {
         videoRef.current.play().then(() => {
             setIsCameraReady(true);
+            updateFocusBox();
         }).catch(err => {
             console.error("Video play failed:", err);
             setError("Could not start camera stream.");
@@ -2611,11 +2636,12 @@ const App = () => {
       @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
       
       /* --- Modals & Overlays --- */
-      .video-container { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
-      .video-wrapper { position: relative; width: 100%; max-width: 800px; }
-      .video-container video { max-width: 100%; max-height: 80vh; border-radius: var(--radius); display: block; }
-      .focus-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60%; height: 40%; border: 2px solid #ffffff; border-radius: var(--radius); pointer-events: none; }
-      @media (max-width: 640px) { .actions-row { flex-direction: column; } .video-wrapper { max-width: 100%; } }
+      .video-container { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; }
+      .video-wrapper { position: relative; width: 100%; flex: 1; display: flex; }
+      .video-container video { width: 100%; height: 100%; object-fit: contain; border-radius: var(--radius); display: block; }
+      .focus-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 2px solid #ffffff; border-radius: var(--radius); pointer-events: none; }
+      @media (max-width: 640px) { .actions-row { flex-direction: column; } }
+
       .video-controls { display: flex; gap: 1.5rem; margin-top: 1.5rem; }
       .video-controls button { padding: 1rem 2rem; font-size: 1.125rem; border-radius: 9999px; }
       .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); backdrop-filter: blur(4px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; }
@@ -2673,7 +2699,8 @@ const App = () => {
           <div className="video-container">
               <div className="video-wrapper">
                 <video ref={videoRef} autoPlay playsInline muted className="camera-view" onCanPlay={handleCanPlay} onClick={() => isCameraReady && takeSnapshot()}></video>
-                <div className="focus-box"></div>
+                <div className="focus-box" style={{ width: `${focusBox.width}px`, height: `${focusBox.height}px` }}></div>
+
                 {!isCameraReady && <div className="camera-loading-spinner"><div className="spinner"></div></div>}
               </div>
               <div className="video-controls">
