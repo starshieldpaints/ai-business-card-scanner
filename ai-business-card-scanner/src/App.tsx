@@ -710,7 +710,7 @@ const App = () => {
     
     try {
         const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const contactsJson = JSON.stringify(savedContacts.map(c => ({ name: c.name, designation: c.designation, company: c.company, phoneNumbers: c.phoneNumbers, emails: c.emails, group: c.group })));
         const prompt = `You are an AI assistant for a business card app. Answer questions about the user's saved contacts based STRICTLY on this JSON data. If info isn't present, say so. Keep answers concise. Contact data: ${contactsJson}\n\nUser question: ${userMessage.text}`;
         const result = await model.generateContent(prompt);
@@ -788,14 +788,14 @@ const App = () => {
       button { cursor: pointer; }
       
       /* --- Main Layout --- */
-      .app-container { min-height: 100vh; display: flex; flex-direction: column; }
+      .app-container { min-height: 0vh; display: flex; flex-direction: column; }
       .app-header { background: rgba(255,255,255,0.8); backdrop-filter: blur(8px); padding: 1rem; border-bottom: 1px solid var(--c-border); display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; position: sticky; top: 0; z-index: 10; }
       .header-title { display: flex; align-items: center; gap: 0.75rem; }
       .app-header img { height: 40px; width: 40px; border-radius: 9999px; }
       .app-header h1 { font-size: 1.25rem; font-weight: 700; }
-      .dashboard { display: grid; grid-template-columns: 1fr; gap: 1.5rem; padding: 1rem; max-w: 1280px; margin: 0 auto; width: 100%; }
-      @media (min-width: 1024px) { .dashboard { grid-template-columns: 3fr 2fr; padding: 2rem; gap: 2rem; } .app-header { padding: 1rem 2rem; } }
-      .app-footer { background-color: var(--c-secondary); color: #cbd5e1; text-align: center; padding: 1.5rem; margin-top: auto; font-size: 0.875rem; }
+      .dashboard { display: grid; grid-template-columns: 1fr; gap: 1.5rem; padding: 0rem; max-w: 1280px; margin: 0 auto; width: 100%; }
+      @media (min-width: 1024px) { .dashboard { grid-template-columns: 3fr 2fr; padding: 0rem; gap: 2rem; } .app-header { padding: 2rem 2rem; } }
+      .app-footer { background-color: var(--c-secondary); width: 180vw;  color: #cbd5e1; text-align: center; padding: 1.5rem; margin-top: auto; font-size: 0.875rem; }
 
       /* --- Card & Panel Styles --- */
       .card { background-color: var(--c-card-bg); border-radius: var(--radius); box-shadow: var(--c-card-shadow); padding: 1.25rem; border: 1px solid var(--c-border); }
