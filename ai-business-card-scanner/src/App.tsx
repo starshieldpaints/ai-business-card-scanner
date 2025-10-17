@@ -289,6 +289,7 @@ const App = () => {
   const [mode, setMode] = useState<AppMode>('single');
   const [savedContacts, setSavedContacts] = useState<ContactData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [frontImageBase64, setFrontImageBase64] = useState<string | null>(null);
   const [backImageBase64, setBackImageBase64] = useState<string | null>(null);
@@ -659,6 +660,78 @@ const App = () => {
       }
   };
 
+  const downloadContactsAsExcel = async () => {
+    if (savedContacts.length === 0) {
+        setError("No contacts available to export yet.");
+        return;
+    }
+
+    setError(null);
+    setIsExporting(true);
+    try {
+        const { Workbook } = await import('exceljs');
+        const workbook = new Workbook();
+        const worksheet = workbook.addWorksheet('Contacts');
+
+        worksheet.columns = [
+            { header: 'Photo', key: 'photo', width: 18 },
+            { header: 'Name', key: 'name', width: 25 },
+            { header: 'Designation', key: 'designation', width: 22 },
+            { header: 'Company', key: 'company', width: 25 },
+            { header: 'Phone Numbers', key: 'phones', width: 24 },
+            { header: 'WhatsApp', key: 'whatsapp', width: 18 },
+            { header: 'Emails', key: 'emails', width: 28 },
+            { header: 'Websites', key: 'websites', width: 28 },
+            { header: 'Group', key: 'group', width: 18 },
+            { header: 'Address', key: 'address', width: 36 },
+            { header: 'Notes', key: 'notes', width: 36 },
+        ];
+        worksheet.getRow(1).font = { bold: true };
+
+        savedContacts.forEach((contact) => {
+            const row = worksheet.addRow({
+                photo: '',
+                name: contact.name || '',
+                designation: contact.designation || '',
+                company: contact.company || '',
+                phones: (contact.phoneNumbers || []).join(', '),
+                whatsapp: contact.whatsapp || '',
+                emails: (contact.emails || []).join(', '),
+                websites: (contact.websites || []).join(', '),
+                group: contact.group || '',
+                address: contact.address || '',
+                notes: contact.notes || '',
+            });
+            row.alignment = { vertical: 'top', wrapText: true };
+            if (contact.imageBase64) {
+                const imageId = workbook.addImage({
+                    base64: contact.imageBase64,
+                    extension: 'jpeg',
+                });
+                const rowIndex = row.number;
+                worksheet.getRow(rowIndex).height = 90;
+                worksheet.addImage(imageId, `A${rowIndex}:A${rowIndex}`);
+            }
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `contacts-${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Failed to export contacts:', err);
+        setError("Could not export contacts. Please try again.");
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
   const saveAllBulk = async () => {
     if (!db || !contactsCollectionRef) return;
     const successfulItems = bulkItems.filter(item => item.status === 'success' && item.extractedData);
@@ -800,7 +873,10 @@ const App = () => {
       /* --- Card & Panel Styles --- */
       .card { background-color: var(--c-card-bg); border-radius: var(--radius); box-shadow: var(--c-card-shadow); padding: 1.25rem; border: 1px solid var(--c-border); }
       .card-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 1.25rem; }
+      .card-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
       .contact-list-panel .card-title { margin-bottom: 1rem; }
+      .contact-list-panel .card-header .card-title { margin-bottom: 0; }
+      .download-btn { min-width: 160px; }
       .contact-list { max-height: 60vh; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
       @media (min-width: 1024px) { .contact-list { max-height: 75vh; } }
       .contact-list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background-color: var(--c-bg); border-radius: var(--radius); border: 1px solid var(--c-border); transition: all 0.2s; cursor: pointer; }
@@ -937,7 +1013,16 @@ const App = () => {
         </div>
         <div className="contact-list-panel">
           <div className="card">
-            <h2 className="card-title">Saved Contacts</h2>
+            <div className="card-header">
+              <h2 className="card-title">Saved Contacts</h2>
+              <button
+                onClick={downloadContactsAsExcel}
+                disabled={isExporting || isLoading || savedContacts.length === 0}
+                className="btn-secondary download-btn"
+              >
+                {isExporting ? 'Preparing...' : 'Download Excel'}
+              </button>
+            </div>
             <div className="contact-list">
               {savedContacts.map(contact => (
                 <div key={contact.id} onClick={() => editContact(contact)} className="contact-list-item">
