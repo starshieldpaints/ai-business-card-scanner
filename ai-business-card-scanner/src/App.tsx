@@ -483,17 +483,78 @@ const App = () => {
     setIsCameraOpen(false);
   };
   
-  const takeSnapshot = () => {
+
+
+
+  // const takeSnapshot = () => {
+  //   if (!videoRef.current || !isCameraReady || videoRef.current.videoWidth === 0) {
+  //       setError("Camera is not ready yet.");
+  //       return;
+  //   }
+
+  //   const video = videoRef.current;
+  //   const canvas = document.createElement("canvas");
+  //   // canvas.width = video.videoWidth;
+  //   // canvas.height = video.videoHeight;
+  //   canvas.width = cropWidth;
+  //   canvas.height = cropHeight;
+  //   const ctx = canvas.getContext('2d');
+
+  //   const base64ToFile = (b64: string, filename: string): File => {
+  //       const byteString = atob(b64);
+  //       const ab = new ArrayBuffer(byteString.length);
+  //       const ia = new Uint8Array(ab);
+  //       for (let i = 0; i < byteString.length; i++) {
+  //           ia[i] = byteString.charCodeAt(i);
+  //       }
+  //       return new File([ia], filename, { type: 'image/jpeg' });
+  //   };
+
+  //   if (ctx) {
+  //       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  //       const base64String = canvas.toDataURL('image/jpeg').split(',')[1];
+  //       if(cameraFor === 'bulk') {
+  //           const filename = `camera-${Date.now()}.jpg`;
+  //           const file = base64ToFile(base64String, filename);
+  //           const newItem: BulkFileItem = { id: `${filename}-${Date.now()}`, file, base64: base64String, status: 'pending' };
+  //           setBulkItems(prev => [...prev, newItem]);
+  //           processCardImages(base64String, null, newItem.id);
+  //       } else if(cameraFor === 'front') {
+  //           setFrontImageBase64(base64String);
+  //       } else {
+  //           setBackImageBase64(base64String);
+  //       }
+  //       closeCamera();
+  //   } else {
+  //       setError("Could not process image from camera.");
+  //   }
+  // };
+
+
+const takeSnapshot = () => {
+    // 1. Safety Checks
     if (!videoRef.current || !isCameraReady || videoRef.current.videoWidth === 0) {
         setError("Camera is not ready yet.");
         return;
     }
 
     const video = videoRef.current;
+
+    // 2. Determine Crop Size
+    // We use the focusBox dimensions because that's what the user sees.
+    const cropWidth = focusBox.width > 0 ? focusBox.width : video.videoWidth;
+    const cropHeight = focusBox.height > 0 ? focusBox.height : video.videoHeight;
+
+    // 3. Create a canvas that is ONLY the size of the card (not the full screen)
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = cropWidth;
+    canvas.height = cropHeight;
     const ctx = canvas.getContext('2d');
+
+    // 4. Calculate the center position
+    // This finds the top-left corner (sx, sy) of the box within the video video
+    const sx = (video.videoWidth - cropWidth) / 2;
+    const sy = (video.videoHeight - cropHeight) / 2;
 
     const base64ToFile = (b64: string, filename: string): File => {
         const byteString = atob(b64);
@@ -506,8 +567,13 @@ const App = () => {
     };
 
     if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // 5. Draw CROPPED image
+        // drawImage params: image, sourceX, sourceY, sourceWidth, sourceHeight, destX, destY, destWidth, destHeight
+        ctx.drawImage(video, sx, sy, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+        
+        // 6. Save the clean, cropped image
         const base64String = canvas.toDataURL('image/jpeg').split(',')[1];
+        
         if(cameraFor === 'bulk') {
             const filename = `camera-${Date.now()}.jpg`;
             const file = base64ToFile(base64String, filename);
@@ -524,6 +590,8 @@ const App = () => {
         setError("Could not process image from camera.");
     }
   };
+
+
 
   const processCardImages = async (frontB64: string, backB64?: string | null, bulkItemId?: string) => {
     if (!isAiConfigured || !API_KEY) {
@@ -623,9 +691,42 @@ const App = () => {
       }
   };
 
-  const downloadVcf = (data: Partial<ContactData>) => {
+  // const downloadVcf = (data: Partial<ContactData>) => {
+  //   const { name, designation, company, phoneNumbers, emails, websites, address, whatsapp } = data;
+  //   let vCard = "BEGIN:VCARD\nVERSION:3.0\n";
+  //   if (name) {
+  //       const nameParts = name.split(' ');
+  //       const lastName = nameParts.pop() || '';
+  //       const firstName = nameParts.join(' ');
+  //       vCard += `FN:${name}\n`;
+  //       vCard += `N:${lastName};${firstName};;;\n`;
+  //   }
+  //   if (company) vCard += `ORG:${company}\n`;
+  //   if (designation) vCard += `TITLE:${designation}\n`;
+  //   if (phoneNumbers) phoneNumbers.forEach((p, i) => { vCard += `TEL;TYPE=WORK,VOICE${i === 0 ? ',PREF' : ''}:${p}\n`; });
+  //   if (whatsapp) vCard += `TEL;TYPE=CELL,WHATSAPP:${whatsapp}\n`;
+  //   if (emails) emails.forEach(e => { vCard += `EMAIL:${e}\n`; });
+  //   if (websites) websites.forEach(w => { vCard += `URL:${w}\n`; });
+  //   if (address) vCard += `ADR;TYPE=WORK:;;${address.replace(/\n/g, '\\n')};;;;\n`;
+  //   vCard += "END:VCARD";
+
+  //   const blob = new Blob([vCard], { type: "text/vcard;charset=utf-8" });
+  //   const url = URL.createObjectURL(blob);
+  //   const a = document.createElement("a");
+  //   a.href = url;
+  //   a.download = (name?.replace(/\s/g, '_') || 'contact') + '.vcf';
+  //   document.body.appendChild(a);
+  //   a.click();
+  //   document.body.removeChild(a);
+  //   URL.revokeObjectURL(url);
+  // };
+
+// Update the function signature to accept 'imageBase64'
+  const downloadVcf = (data: Partial<ContactData>, imageBase64?: string | null) => {
     const { name, designation, company, phoneNumbers, emails, websites, address, whatsapp } = data;
+    
     let vCard = "BEGIN:VCARD\nVERSION:3.0\n";
+    
     if (name) {
         const nameParts = name.split(' ');
         const lastName = nameParts.pop() || '';
@@ -640,6 +741,14 @@ const App = () => {
     if (emails) emails.forEach(e => { vCard += `EMAIL:${e}\n`; });
     if (websites) websites.forEach(w => { vCard += `URL:${w}\n`; });
     if (address) vCard += `ADR;TYPE=WORK:;;${address.replace(/\n/g, '\\n')};;;;\n`;
+
+    // --- NEW: ADD PHOTO TO CONTACT ---
+    if (imageBase64) {
+        // vCard 3.0 requires base64 photos to be stripped of whitespace
+        vCard += `PHOTO;ENCODING=b;TYPE=JPEG:${imageBase64.replace(/\s/g, '')}\n`;
+    }
+    // ---------------------------------
+
     vCard += "END:VCARD";
 
     const blob = new Blob([vCard], { type: "text/vcard;charset=utf-8" });
@@ -653,9 +762,16 @@ const App = () => {
     URL.revokeObjectURL(url);
   };
   
-  const handleSave = () => {
+  // const handleSave = () => {
+  //     if (extractedData) {
+  //         downloadVcf(extractedData);
+  //         saveContactToFirebase();
+  //     }
+  // };
+const handleSave = () => {
       if (extractedData) {
-          downloadVcf(extractedData);
+          // Pass 'frontImageBase64' as the second argument
+          downloadVcf(extractedData, frontImageBase64); 
           saveContactToFirebase();
       }
   };
@@ -963,12 +1079,20 @@ const App = () => {
       
       /* --- Modals & Overlays --- */
       .video-container { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; }
-      .video-wrapper { position: relative; width: 100%; flex: 1; display: flex; }
+      .video-wrapper { position: relative; width: 100%;height: 100%;display: flex;align-items: center;justify-content: center; flex: 1; }
       .video-container video { width: 100%; height: 100%; object-fit: contain; border-radius: var(--radius); display: block; }
       .focus-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 2px solid #ffffff; border-radius: var(--radius); pointer-events: none; }
       @media (max-width: 640px) { .actions-row { flex-direction: column; } }
 
-      .video-controls { display: flex; gap: 1.5rem; margin-top: 1.5rem; }
+      .video-controls { position: absolute; /* Floating buttons */
+        bottom: 2rem;       /* Distance from bottom */
+        left: 0;
+        width: 100%;
+        display: flex; 
+        justify-content: center;
+        gap: 1.5rem; 
+        z-index: 60;        /* Ensure buttons are ON TOP of everything */
+        padding: 0 1rem;}
       .video-controls button { padding: 1rem 2rem; font-size: 1.125rem; border-radius: 9999px; }
       .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); backdrop-filter: blur(4px); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; }
       .camera-loading-spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
