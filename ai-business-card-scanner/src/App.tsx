@@ -309,7 +309,7 @@ const App = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const chatDisplayRef = useRef<HTMLDivElement>(null);
-
+  const focusBoxRef = useRef<HTMLDivElement>(null); // <--- ADD THIS
   // --- Effects ---
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: BeforeInstallPromptEvent) => {
@@ -531,49 +531,130 @@ const App = () => {
   // };
 
 
+// const takeSnapshot = () => {
+//     // 1. Safety Checks
+//     if (!videoRef.current || !isCameraReady || videoRef.current.videoWidth === 0) {
+//         setError("Camera is not ready yet.");
+//         return;
+//     }
+
+//     const video = videoRef.current;
+
+//     // 2. Determine Crop Size
+//     // We use the focusBox dimensions because that's what the user sees.
+//     const cropWidth = focusBox.width > 0 ? focusBox.width : video.videoWidth;
+//     const cropHeight = focusBox.height > 0 ? focusBox.height : video.videoHeight;
+
+//     // 3. Create a canvas that is ONLY the size of the card (not the full screen)
+//     const canvas = document.createElement("canvas");
+//     canvas.width = cropWidth;
+//     canvas.height = cropHeight;
+//     const ctx = canvas.getContext('2d');
+
+//     // 4. Calculate the center position
+//     // This finds the top-left corner (sx, sy) of the box within the video video
+//     const sx = (video.videoWidth - cropWidth) / 2;
+//     const sy = (video.videoHeight - cropHeight) / 2;
+
+//     const base64ToFile = (b64: string, filename: string): File => {
+//         const byteString = atob(b64);
+//         const ab = new ArrayBuffer(byteString.length);
+//         const ia = new Uint8Array(ab);
+//         for (let i = 0; i < byteString.length; i++) {
+//             ia[i] = byteString.charCodeAt(i);
+//         }
+//         return new File([ia], filename, { type: 'image/jpeg' });
+//     };
+
+//     if (ctx) {
+//         // 5. Draw CROPPED image
+//         // drawImage params: image, sourceX, sourceY, sourceWidth, sourceHeight, destX, destY, destWidth, destHeight
+//         ctx.drawImage(video, sx, sy, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+        
+//         // 6. Save the clean, cropped image
+//         const base64String = canvas.toDataURL('image/jpeg').split(',')[1];
+        
+//         if(cameraFor === 'bulk') {
+//             const filename = `camera-${Date.now()}.jpg`;
+//             const file = base64ToFile(base64String, filename);
+//             const newItem: BulkFileItem = { id: `${filename}-${Date.now()}`, file, base64: base64String, status: 'pending' };
+//             setBulkItems(prev => [...prev, newItem]);
+//             processCardImages(base64String, null, newItem.id);
+//         } else if(cameraFor === 'front') {
+//             setFrontImageBase64(base64String);
+//         } else {
+//             setBackImageBase64(base64String);
+//         }
+//         closeCamera();
+//     } else {
+//         setError("Could not process image from camera.");
+//     }
+//   };
+
+
 const takeSnapshot = () => {
-    // 1. Safety Checks
     if (!videoRef.current || !isCameraReady || videoRef.current.videoWidth === 0) {
         setError("Camera is not ready yet.");
         return;
     }
 
     const video = videoRef.current;
+    
+    // 1. Get exact screen positions
+    // We need to know where the video is on screen, and where the box is on screen.
+    const videoRect = video.getBoundingClientRect();
+    const boxRect = focusBoxRef.current?.getBoundingClientRect();
 
-    // 2. Determine Crop Size
-    // We use the focusBox dimensions because that's what the user sees.
-    const cropWidth = focusBox.width > 0 ? focusBox.width : video.videoWidth;
-    const cropHeight = focusBox.height > 0 ? focusBox.height : video.videoHeight;
+    if (!boxRect) return;
 
-    // 3. Create a canvas that is ONLY the size of the card (not the full screen)
+    // 2. Calculate the Scale Factor
+    // (How many camera pixels equal one screen pixel?)
+    const scaleX = video.videoWidth / videoRect.width;
+    const scaleY = video.videoHeight / videoRect.height;
+
+    // 3. Calculate Crop Coordinates
+    // relative to the video source
+    const cropX = (boxRect.left - videoRect.left) * scaleX;
+    const cropY = (boxRect.top - videoRect.top) * scaleY;
+    const cropWidth = boxRect.width * scaleX;
+    const cropHeight = boxRect.height * scaleY;
+
+    // 4. Create Canvas & Draw
     const canvas = document.createElement("canvas");
     canvas.width = cropWidth;
     canvas.height = cropHeight;
     const ctx = canvas.getContext('2d');
 
-    // 4. Calculate the center position
-    // This finds the top-left corner (sx, sy) of the box within the video video
-    const sx = (video.videoWidth - cropWidth) / 2;
-    const sy = (video.videoHeight - cropHeight) / 2;
-
-    const base64ToFile = (b64: string, filename: string): File => {
-        const byteString = atob(b64);
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-        for (let i = 0; i < byteString.length; i++) {
-            ia[i] = byteString.charCodeAt(i);
-        }
-        return new File([ia], filename, { type: 'image/jpeg' });
-    };
-
     if (ctx) {
-        // 5. Draw CROPPED image
-        // drawImage params: image, sourceX, sourceY, sourceWidth, sourceHeight, destX, destY, destWidth, destHeight
-        ctx.drawImage(video, sx, sy, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+        // Draw only the area inside the box
+        ctx.drawImage(
+            video, 
+            cropX, cropY, cropWidth, cropHeight, // Source (Camera)
+            0, 0, cropWidth, cropHeight          // Destination (Canvas)
+        );
         
-        // 6. Save the clean, cropped image
-        const base64String = canvas.toDataURL('image/jpeg').split(',')[1];
+        // 5. Save & Download
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        const base64String = dataUrl.split(',')[1];
         
+        // Auto-download to confirm it worked
+        const downloadLink = document.createElement('a');
+        downloadLink.href = dataUrl;
+        downloadLink.download = `cropped_card_${Date.now()}.jpg`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+
+        const base64ToFile = (b64: string, filename: string): File => {
+             const byteString = atob(b64);
+             const ab = new ArrayBuffer(byteString.length);
+             const ia = new Uint8Array(ab);
+             for (let i = 0; i < byteString.length; i++) {
+                 ia[i] = byteString.charCodeAt(i);
+             }
+             return new File([ia], filename, { type: 'image/jpeg' });
+         };
+
         if(cameraFor === 'bulk') {
             const filename = `camera-${Date.now()}.jpg`;
             const file = base64ToFile(base64String, filename);
@@ -586,12 +667,8 @@ const takeSnapshot = () => {
             setBackImageBase64(base64String);
         }
         closeCamera();
-    } else {
-        setError("Could not process image from camera.");
     }
   };
-
-
 
   const processCardImages = async (frontB64: string, backB64?: string | null, bulkItemId?: string) => {
     if (!isAiConfigured || !API_KEY) {
@@ -722,11 +799,13 @@ const takeSnapshot = () => {
   // };
 
 // Update the function signature to accept 'imageBase64'
-  const downloadVcf = (data: Partial<ContactData>, imageBase64?: string | null) => {
+// Change the function signature to accept 'currentImage'
+  const downloadVcf = (data: Partial<ContactData>, currentImage?: string | null) => {
     const { name, designation, company, phoneNumbers, emails, websites, address, whatsapp } = data;
     
     let vCard = "BEGIN:VCARD\nVERSION:3.0\n";
     
+    // Name
     if (name) {
         const nameParts = name.split(' ');
         const lastName = nameParts.pop() || '';
@@ -734,6 +813,8 @@ const takeSnapshot = () => {
         vCard += `FN:${name}\n`;
         vCard += `N:${lastName};${firstName};;;\n`;
     }
+    
+    // Standard Details
     if (company) vCard += `ORG:${company}\n`;
     if (designation) vCard += `TITLE:${designation}\n`;
     if (phoneNumbers) phoneNumbers.forEach((p, i) => { vCard += `TEL;TYPE=WORK,VOICE${i === 0 ? ',PREF' : ''}:${p}\n`; });
@@ -742,15 +823,16 @@ const takeSnapshot = () => {
     if (websites) websites.forEach(w => { vCard += `URL:${w}\n`; });
     if (address) vCard += `ADR;TYPE=WORK:;;${address.replace(/\n/g, '\\n')};;;;\n`;
 
-    // --- NEW: ADD PHOTO TO CONTACT ---
-    if (imageBase64) {
-        // vCard 3.0 requires base64 photos to be stripped of whitespace
-        vCard += `PHOTO;ENCODING=b;TYPE=JPEG:${imageBase64.replace(/\s/g, '')}\n`;
+    // --- KEY CHANGE: Add the Cropped Photo ---
+    if (currentImage) {
+        // We remove any potential whitespace to ensure valid format
+        vCard += `PHOTO;ENCODING=b;TYPE=JPEG:${currentImage.replace(/\s/g, '')}\n`;
     }
-    // ---------------------------------
+    // -----------------------------------------
 
     vCard += "END:VCARD";
 
+    // Trigger Download
     const blob = new Blob([vCard], { type: "text/vcard;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -761,7 +843,6 @@ const takeSnapshot = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
-  
   // const handleSave = () => {
   //     if (extractedData) {
   //         downloadVcf(extractedData);
@@ -1081,8 +1162,18 @@ const handleSave = () => {
       .video-container { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; }
       .video-wrapper { position: relative; width: 100%;height: 100%;display: flex;align-items: center;justify-content: center; flex: 1; }
       .video-container video { width: 100%; height: 100%; object-fit: contain; border-radius: var(--radius); display: block; }
-      .focus-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 2px solid #ffffff; border-radius: var(--radius); pointer-events: none; }
-      @media (max-width: 640px) { .actions-row { flex-direction: column; } }
+      .focus-box { 
+        position: absolute; 
+        top: 50%; 
+        left: 50%; 
+        transform: translate(-50%, -50%); 
+        border: 2px solid #ffffff; 
+        border-radius: var(--radius); 
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7); /* Dark overlay around the box */
+        pointer-events: none; 
+        z-index: 55;
+      }      
+        @media (max-width: 640px) { .actions-row { flex-direction: column; } }
 
       .video-controls { position: absolute; /* Floating buttons */
         bottom: 2rem;       /* Distance from bottom */
@@ -1173,6 +1264,7 @@ const handleSave = () => {
           <div className="video-container">
               <div className="video-wrapper">
                 <video ref={videoRef} autoPlay playsInline muted className="camera-view" onCanPlay={handleCanPlay} onClick={() => isCameraReady && takeSnapshot()}></video>
+                <div ref={focusBoxRef} className="focus-box" style={{ width: `${focusBox.width}px`, height: `${focusBox.height}px` }}></div>
                 <div className="focus-box" style={{ width: `${focusBox.width}px`, height: `${focusBox.height}px` }}></div>
 
                 {!isCameraReady && <div className="camera-loading-spinner"><div className="spinner"></div></div>}
