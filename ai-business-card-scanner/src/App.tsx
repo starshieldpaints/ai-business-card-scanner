@@ -3999,7 +3999,6 @@ const processAndOptimizeImage = (base64Str: string): Promise<string> => {
             let width = img.width;
             let height = img.height;
 
-            // Resize Logic
             if (width > height) {
                 if (width > MAX_SIZE) {
                     height *= MAX_SIZE / width;
@@ -4017,11 +4016,10 @@ const processAndOptimizeImage = (base64Str: string): Promise<string> => {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.drawImage(img, 0, 0, width, height);
-
-                // --- AGGRESSIVE SCANNER FILTER ---
+                
+                // Scan Filter
                 const imageData = ctx.getImageData(0, 0, width, height);
                 const data = imageData.data;
-                
                 const contrast = 1.4; 
                 const brightness = 30; 
                 const intercept = 128 * (1 - contrast);
@@ -4030,11 +4028,7 @@ const processAndOptimizeImage = (base64Str: string): Promise<string> => {
                     let r = data[i] * contrast + intercept + brightness;
                     let g = data[i + 1] * contrast + intercept + brightness;
                     let b = data[i + 2] * contrast + intercept + brightness;
-
-                    if (r > 180 && g > 180 && b > 180) { 
-                        r = 255; g = 255; b = 255; 
-                    }
-
+                    if (r > 180 && g > 180 && b > 180) { r = 255; g = 255; b = 255; }
                     data[i] = Math.min(255, Math.max(0, r));
                     data[i + 1] = Math.min(255, Math.max(0, g));
                     data[i + 2] = Math.min(255, Math.max(0, b));
@@ -4056,7 +4050,7 @@ const processAndOptimizeImage = (base64Str: string): Promise<string> => {
 const ActionPanel = React.memo(({ extractedData, ...props }: any) => {
     if (extractedData) return <VerificationForm extractedData={extractedData} {...props} />;
     return (
-       <div className="card">
+       <div className="card h-full">
           <div className="tabs">
             <button className={`tab ${props.mode === 'single' ? 'active' : ''}`} onClick={() => props.setMode('single')}>Single Card</button>
             <button className={`tab ${props.mode === 'bulk' ? 'active' : ''}`} onClick={() => props.setMode('bulk')}>Bulk Upload</button>
@@ -4217,6 +4211,32 @@ const renderArrayField = (label: string, field: string, extractedData: any, hand
     </div>
 );
 
+// --- NEW COMPONENT: Contact Preview ---
+const ContactPreview = ({ contact, onClose, onEdit }: { contact: ContactData, onClose: () => void, onEdit: (c: ContactData) => void }) => (
+    <div className="preview-overlay">
+        <div className="preview-card">
+            <button className="preview-close" onClick={onClose}>✕</button>
+            <div className="preview-content">
+                <div className="preview-image-container">
+                    <img src={`data:image/jpeg;base64,${contact.imageBase64}`} alt="Card" />
+                </div>
+                <div className="preview-details">
+                    <h2>{contact.name || 'No Name'}</h2>
+                    <p className="detail-role">{contact.designation}</p>
+                    <p className="detail-company">{contact.company}</p>
+                    <div className="detail-grid">
+                        {contact.phoneNumbers?.length > 0 && <div className="detail-item"><strong>Phone:</strong> {contact.phoneNumbers.join(', ')}</div>}
+                        {contact.emails?.length > 0 && <div className="detail-item"><strong>Email:</strong> {contact.emails.join(', ')}</div>}
+                        {contact.websites?.length > 0 && <div className="detail-item"><strong>Web:</strong> {contact.websites.join(', ')}</div>}
+                        {contact.address && <div className="detail-item"><strong>Addr:</strong> {contact.address}</div>}
+                    </div>
+                    <button className="btn-primary mt-4" onClick={() => onEdit(contact)}>Edit Contact</button>
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
 // --- MAIN APP ---
 const App = () => {
   const [mode, setMode] = useState<AppMode>('single');
@@ -4236,6 +4256,7 @@ const App = () => {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [focusBox, setFocusBox] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [previewContact, setPreviewContact] = useState<ContactData | null>(null);
   
   // PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
@@ -4263,19 +4284,16 @@ const App = () => {
     setIsLoading(true);
     let loadedFromFirebase = false;
 
-    // --- FIX: Client-side sorting ---
     if (contactsCollectionRef && isFirebaseConfigured) {
       try {
         const q = query(contactsCollectionRef); 
         const data = await getDocs(q);
         let docs = data.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContactData));
-        
         docs.sort((a, b) => {
              const tA = a.createdAt?.seconds || 0;
              const tB = b.createdAt?.seconds || 0;
              return tB - tA; // Descending
         });
-        
         setSavedContacts(docs);
         loadedFromFirebase = true;
       } catch (e) { console.warn("Firebase fetch warning:", e); }
@@ -4369,11 +4387,9 @@ const App = () => {
     const ctx = canvas.getContext('2d');
     
     if (ctx) {
-        // Draw Cropped Region
         ctx.drawImage(video, sourceX, sourceY, sourceW, sourceH, 0, 0, sourceW, sourceH);
         
         const rawBase64 = canvas.toDataURL('image/jpeg').split(',')[1];
-        // Apply Scan Filter
         const optimizedBase64 = await processAndOptimizeImage(rawBase64);
 
         if(cameraFor === 'bulk') {
@@ -4504,6 +4520,7 @@ const App = () => {
       const filtered = local.filter((c: ContactData) => c.id !== id);
       localStorage.setItem('scannedCardsLocal', JSON.stringify(filtered));
       fetchContacts();
+      if(previewContact?.id === id) setPreviewContact(null);
   };
 
   // --- EXCEL DOWNLOAD ---
@@ -4557,6 +4574,14 @@ const App = () => {
   const goToNextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
   const goToPrevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
 
+  const editContact = (contact: ContactData) => {
+      setExtractedData(contact);
+      setFrontImageBase64(contact.imageBase64);
+      setMode('single');
+      setPreviewContact(null);
+      window.scrollTo(0,0);
+  }
+
   const componentProps = {
     mode, setMode,
     isLoading,
@@ -4586,11 +4611,22 @@ const App = () => {
     <style>{`
       :root { --c-primary: #6366f1; --c-bg: #f0f2f5; }
       body { background: var(--c-bg); font-family: sans-serif; margin: 0; padding-bottom: 50px; }
-      .app-container { max-width: 600px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+      .app-container { max-width: 1200px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
       .app-header { background: white; padding: 1rem; position: sticky; top: 0; z-index: 50; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
       .header-title { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.2rem; }
       .header-title img { width: 30px; height: 30px; border-radius: 50%; }
-      .dashboard { padding: 1rem; flex: 1; display: flex; flex-direction: column; gap: 1rem; }
+      
+      .dashboard { padding: 1rem; flex: 1; display: grid; gap: 1rem; grid-template-columns: 1fr; }
+      
+      /* --- DESKTOP 3-COLUMN LAYOUT --- */
+      @media (min-width: 1024px) {
+          .dashboard { grid-template-columns: 350px 1fr 350px; align-items: start; }
+      }
+      /* --- TABLET/SMALL DESKTOP 2-COLUMN LAYOUT --- */
+      @media (min-width: 768px) and (max-width: 1023px) {
+          .dashboard { grid-template-columns: 1fr 1fr; }
+      }
+
       .card { background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
       .tabs { display: flex; background: #f3f4f6; padding: 4px; border-radius: 8px; margin-bottom: 1rem; }
       .tab { flex: 1; padding: 8px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: #666; border-radius: 6px; }
@@ -4612,23 +4648,44 @@ const App = () => {
       .btn-capture { background: white; width: 70px; height: 70px; border-radius: 50%; border: 4px solid rgba(255,255,255,0.3); cursor: pointer; }
       .btn-close-cam { background: rgba(255,255,255,0.2); color: white; border: none; padding: 10px 20px; border-radius: 20px; backdrop-filter: blur(4px); cursor: pointer; }
       .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.9); z-index: 200; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-      .contact-list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+      .contact-list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; transition: background 0.2s; }
+      .contact-list-item:hover { background: #f9fafb; }
       .contact-info { display: flex; align-items: center; gap: 10px; }
       .contact-info img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #eee; }
       .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
       .excel-btn { display: flex; align-items: center; gap: 6px; background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.9rem; cursor: pointer; }
       
-      /* --- PREVIEW FIX --- */
       .image-previews { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; justify-content: center; }
       .preview-container { flex: 1; min-width: 150px; max-width: 100%; position: relative; text-align: center; }
       .preview-container img { width: 100%; height: auto; max-height: 250px; object-fit: contain; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
       .upload-box-small { border: 2px dashed #ddd; padding: 1rem; text-align: center; border-radius: 8px; cursor: pointer; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 150px; }
 
-      /* --- PAGINATION CSS --- */
       .pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; }
-      .pagination button { background: white; border: 1px solid #ddd; padding: 6px 12px; width: auto; font-size: 0.9rem; border-radius: 6px; }
+      .pagination button { background: white; border: 1px solid #ddd; padding: 6px 12px; width: auto; font-size: 0.9rem; border-radius: 6px; cursor: pointer; }
       .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
       .pagination span { font-size: 0.9rem; color: #666; }
+
+      /* --- PREVIEW PANEL / MODAL STYLES --- */
+      .preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); }
+      .preview-card { background: white; width: 100%; max-width: 400px; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: slideUp 0.3s ease; position: relative; }
+      .preview-close { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.1); border: none; width: 30px; height: 30px; border-radius: 50%; font-weight: bold; cursor: pointer; z-index: 10; }
+      .preview-image-container { background: #f3f4f6; padding: 1rem; text-align: center; }
+      .preview-image-container img { max-width: 100%; max-height: 250px; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+      .preview-details { padding: 1.5rem; }
+      .preview-details h2 { margin: 0 0 5px 0; color: #1f2937; }
+      .detail-role { color: var(--c-primary); font-weight: 600; margin-bottom: 2px; }
+      .detail-company { color: #6b7280; font-size: 0.9rem; margin-bottom: 1rem; }
+      .detail-grid { display: grid; gap: 8px; font-size: 0.9rem; }
+      .detail-item { word-break: break-word; }
+      @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+      /* Desktop Preview Panel (Not Modal) */
+      @media (min-width: 1024px) {
+          .desktop-preview-container { position: sticky; top: 80px; height: fit-content; }
+          .preview-overlay.desktop-mode { position: static; background: transparent; padding: 0; backdrop-filter: none; display: block; }
+          .preview-card.desktop-mode { max-width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; animation: none; }
+          .preview-close.desktop-mode { display: none; } /* Hide close button on desktop if preferred */
+      }
     `}</style>
 
     <div className="app-container">
@@ -4640,10 +4697,13 @@ const App = () => {
       </header>
 
       <main className="dashboard">
+        
+        {/* LEFT COLUMN: ACTION PANEL */}
         <div className="action-panel">
           <ActionPanel extractedData={extractedData} {...componentProps} />
         </div>
 
+        {/* MIDDLE COLUMN: CONTACT LIST */}
         <div className="card">
             <div className="list-header">
                 <h3>Saved Contacts ({savedContacts.length})</h3>
@@ -4657,7 +4717,12 @@ const App = () => {
             <div className="contact-list">
               {savedContacts.length === 0 ? <p style={{color:'#888', textAlign:'center'}}>No contacts yet.</p> : 
                savedContacts.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map(contact => (
-                <div key={contact.id} className="contact-list-item" onClick={() => { setExtractedData(contact); setFrontImageBase64(contact.imageBase64); setMode('single'); window.scrollTo(0,0); }}>
+                <div 
+                    key={contact.id} 
+                    className="contact-list-item" 
+                    onClick={() => setPreviewContact(contact)}
+                    style={previewContact?.id === contact.id ? {background: '#eff6ff', borderColor: '#bfdbfe'} : {}}
+                >
                   <div className="contact-info">
                     <img src={`data:image/jpeg;base64,${contact.imageBase64}`} alt="Thumbnail" />
                     <div>
@@ -4670,7 +4735,7 @@ const App = () => {
               ))}
             </div>
 
-            {/* --- RESTORED PAGINATION CONTROLS --- */}
+            {/* PAGINATION CONTROLS */}
             {savedContacts.length > itemsPerPage && (
                 <div className="pagination">
                     <button onClick={goToPrevPage} disabled={currentPage === 1}>
@@ -4682,8 +4747,40 @@ const App = () => {
                     </button>
                 </div>
             )}
-
         </div>
+
+        {/* RIGHT COLUMN: PREVIEW (Desktop Only logic handled via CSS media queries) */}
+        {/* On Mobile, this renders as a Modal. On Desktop, it sits in the 3rd grid column */}
+        {previewContact && (
+            <div className={`desktop-preview-container`}>
+                 <div className={`preview-overlay ${window.innerWidth >= 1024 ? 'desktop-mode' : ''}`}>
+                    <div className={`preview-card ${window.innerWidth >= 1024 ? 'desktop-mode' : ''}`}>
+                        <button className={`preview-close ${window.innerWidth >= 1024 ? 'desktop-mode' : ''}`} onClick={() => setPreviewContact(null)}>✕</button>
+                        <div className="preview-content">
+                            <div className="preview-image-container">
+                                <img src={`data:image/jpeg;base64,${previewContact.imageBase64}`} alt="Card" />
+                            </div>
+                            <div className="preview-details">
+                                <h2>{previewContact.name || 'No Name'}</h2>
+                                <p className="detail-role">{previewContact.designation}</p>
+                                <p className="detail-company">{previewContact.company}</p>
+                                <div className="detail-grid">
+                                    {previewContact.phoneNumbers?.length > 0 && <div className="detail-item"><strong>Phone:</strong> {previewContact.phoneNumbers.join(', ')}</div>}
+                                    {previewContact.emails?.length > 0 && <div className="detail-item"><strong>Email:</strong> {previewContact.emails.join(', ')}</div>}
+                                    {previewContact.websites?.length > 0 && <div className="detail-item"><strong>Web:</strong> {previewContact.websites.join(', ')}</div>}
+                                    {previewContact.address && <div className="detail-item"><strong>Addr:</strong> {previewContact.address}</div>}
+                                    {previewContact.group && <div className="detail-item"><strong>Group:</strong> {previewContact.group}</div>}
+                                </div>
+                                <button className="btn-primary mt-4" style={{marginTop:'1rem'}} onClick={() => editContact(previewContact)}>Edit / Fix Info</button>
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+                 {/* Mobile Overlay Background Click to Close */}
+                 {window.innerWidth < 1024 && <div style={{position:'fixed', inset:0, zIndex:99}} onClick={() => setPreviewContact(null)}></div>}
+            </div>
+        )}
+
       </main>
 
       {isCameraOpen && (
